@@ -2,6 +2,22 @@
 
 use feature qw(say);
 
+# you specify a pattern by creating a regular expression or regex
+$pattern = qr/Frodo/;
+say "A sample pattern: $pattern";
+
+# Most of your data will probably be text strings, but 
+# there’s nothing stopping you from using regexes to search and replace 
+# any byte sequence. 
+$byte_sequence = "cafe babe: \xCA\xFE\xBA\xBE is used to identify Java bytecode class file";
+$byte_pattern = qr/\xCA\xFE/;
+if ($byte_sequence =~ $byte_pattern) {
+	say "$byte_sequence match $byte_pattern";
+}
+
+# matching and substituting operator are also parsed like
+# double-quoted string
+
 # match operartor
 
 $haystack = 'a needle in a haystack';	# (un ago in un pagliaio)
@@ -117,6 +133,19 @@ $_= 'proPERly';
 say if (/perl/i);
 $_= 'perLiter';
 say if (/perl/i);
+
+use feature qw/unicode_strings/;
+say lc('AΣ');
+say 'match' if ('Σ' =~ /Σ/i);
+#GREEK CAPITAL LETTER SIGMA
+#Unicode: U+03A3, UTF-8: CE A3
+say 'match' if ('ς' =~ /Σ/i);
+#GREEK SMALL LETTER FINAL SIGMA
+#Unicode: U+03C2, UTF-8: CF 82
+say 'match' if ('σ' =~ /Σ/i);
+#GREEK SMALL LETTER SIGMA
+#Unicode: U+03C3, UTF-8: CF 83
+
 # The lowercase of capital “Σ” is normally “σ”, but becomes “ς” at the end 
 # of a word. sisyphus has all three sigmas in it.
 $_ = 'ΣΊΣΥΦΟΣ';
@@ -135,7 +164,7 @@ say $1 if(/(.*)/s);
 # Let ^ and $ also match next to embedded \n.
 say $1 if(/(^a.*n$)/m);
 
-HERE
+#HERE
 
 #  a simple pattern
 /Frodo/;
