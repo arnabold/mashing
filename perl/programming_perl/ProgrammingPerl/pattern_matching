@@ -1,0 +1,216 @@
+#!/opt/local/bin/perl
+
+use feature qw(say);
+
+# you specify a pattern by creating a regular expression or regex
+$pattern = qr/Frodo/;
+say "A sample pattern: $pattern";
+
+# Most of your data will probably be text strings, but 
+# there’s nothing stopping you from using regexes to search and replace 
+# any byte sequence. 
+$byte_sequence = "cafe babe: \xCA\xFE\xBA\xBE is used to identify Java bytecode class file";
+$byte_pattern = qr/\xCA\xFE/;
+if ($byte_sequence =~ $byte_pattern) {
+	say "$byte_sequence match $byte_pattern";
+}
+
+# matching and substituting operator are also parsed like
+# double-quoted string
+
+# match operartor
+
+$haystack = 'a needle in a haystack';	# (un ago in un pagliaio)
+
+if ($haystack =~ m/needle/) { 		
+	say "'$haystack' matches '/needle/'";
+}
+if ($haystack =~ /needle/) { 	
+	say "'$haystack' matches '/needle/'";
+}
+if ($haystack =~ 'needle') { 
+	say "'$haystack' matches '/needle/'";
+}
+if ($haystack =~ "needle") { 
+	say "'$haystack' matches '/needle/'";
+}
+$needle = qr/needle/; # specify a pattern
+if ($haystack =~ m/$needle/) { 		
+	say "'$haystack' matches $needle";
+}
+if ($haystack =~ $needle) { 		
+	say "'$haystack' matches $needle";
+}
+
+# match without a binding operartor: search in $_
+$_ = 'Looking for a new life or a new civilization';
+if(/new life/ and /new civilization/) {
+	say;
+}
+
+# binding operators =~ and !~ have rather high precedence
+if ((lc 'RABBIT') =~ /rabbit/) {# lc : lowercase
+	say "What's up doc?";
+}	
+if (lc 'RABBIT' =~ /rabbit/) {	# does not match
+	say "What's up doc?";
+}	
+
+# negates binding operator: not match operator
+$song = 'This is a song';
+if ($song !~ /words/) {
+	say qq/"$song" appears to be a song without words./;
+}
+
+# substitute operator
+$italiano = 'butter';
+if ($italiano =~ s/butter/olive oil/) {
+	say "$italiano";
+}
+
+# substitute without a binding operator: substitute in $_;
+$_ = 'sugar';
+if (s/sugar/aspartame/) {
+	say;
+}
+
+# translitering
+$rotate13 = 'Gaius Julius Caesar';
+if ($rotate13 =~ tr/a-zA-Z/n-za-mN-ZA-M/) {
+	say "$rotate13";
+}
+
+# translitering without a binding operator: translitering $_
+$_ = 'ATCG'; # DNA
+if (tr/ATCG/TAGC/) {	# complementing DNA
+	say;
+}
+
+# y/// is a synonym of tr///
+
+
+## quote operators
+$string = 'pippo';
+# single quote operator like ''
+say q/$string/;
+# double quote operator like ""
+say qq/$string/;
+# quote regex operator 
+say qr/$string/;
+# quote words operator like a list of words
+say qw/$string $string $string/;
+# m//, s/// and tr// are quote operators
+$path='/tmp';
+say $path if ($path =~ s#/tmp#/var/tmp/scratch#);
+$path = '/bin';
+say 'No binary directory please.' if ($path =~ m[/bin]);
+$_ = 'egg';
+s (egg)   <larva>;
+s {larva} {pupa};
+s [pupa]  /imago/;
+say;
+
+# if pattern matches, $`, $&, $' are available
+'hot cross buns' =~ /cross/;
+say "Matched: <$`> <$&> <$'>";
+say "Left:  <$`>";
+say "Match: <$&>";
+say "Right: <$'>";
+
+# a better alternative to $`, $&, $' is the /p match modifier
+'hot cross buns' =~ /cross/p;
+say "Matched: <${^PREMATCH}> <${^MATCH}> <${^POSTMATCH}>";
+
+# if pattern matches, capture with parentheses
+$_ = q/Bilbo Baggin's birtday is September 22/;
+/(.*)'s birtday is (.*)/;	# .* means 0 or more chars
+say "Person: $1";
+say "Date: $2";
+
+## modifiers
+# case insensitive matching
+$_= 'proPERly';
+say if (/perl/i);
+$_= 'perLiter';
+say if (/perl/i);
+
+use feature qw/unicode_strings/;
+say lc('AΣ');
+say 'match' if ('Σ' =~ /Σ/i);
+#GREEK CAPITAL LETTER SIGMA
+#Unicode: U+03A3, UTF-8: CE A3
+say 'match' if ('ς' =~ /Σ/i);
+#GREEK SMALL LETTER FINAL SIGMA
+#Unicode: U+03C2, UTF-8: CF 82
+say 'match' if ('σ' =~ /Σ/i);
+#GREEK SMALL LETTER SIGMA
+#Unicode: U+03C3, UTF-8: CF 83
+
+# The lowercase of capital “Σ” is normally “σ”, but becomes “ς” at the end 
+# of a word. sisyphus has all three sigmas in it.
+$_ = 'ΣΊΣΥΦΟΣ';
+say if (/σίσυφος/i);
+$_ = 'Σίσυφος';
+say if (/σίσυφος/i);
+$_ = 'ςίσυφοσ';
+say if (/σίσυφος/i);
+
+$_ = "A line with a newline\nand so on";
+say $1 if(/(.*)/);
+# assuming string contains a single line.  
+# Let . also match newline.
+say $1 if(/(.*)/s);
+# assuming string contains multiple lines. 
+# Let ^ and $ also match next to embedded \n.
+say $1 if(/(^a.*n$)/m);
+
+#HERE
+
+#  a simple pattern
+/Frodo/;
+
+# the twelve metacharacters
+$twelve_metacharacters = '\ | ( ) [ { ^ $ * + ? .';
+
+# to match metacharcters literally, backslash them
+say "The twelve metacharacters used in pattern: $twelve_metacharacters";
+
+# a strcuctural metacharacter: alternantion with |
+/Frodo|Pippin|Merry|Sam/;
+
+# grouping with ()
+/(Frodo|Drogo|Bilbo) Baggins/;
+/(Frod|Drog|Bilb)o Baggins/;
+
+# quantifiers; have only sense when attached to assertions that have width
+/a*/;
+/a+/;
+/a?/;
+/a*?/;
+/a*+/;
+/a{3}/;
+/a{2,5}/;
+/\b*/; # does not make sense!
+
+# to match barbarbar
+/(bar){3}/;
+
+# to match barrr
+/bar{3}/;
+
+# two pass of processing: interpolation and regex assertion
+$foo = "bar";
+/$foo$/; # /bar$/
+
+$somepattern = /Frodo/;
+$somestring = 'Frodo Baggins';
+say "matches" if $somestring =~ $somepattern;
+say "matches" if $somestring =~ m/$somepattern/;
+
+# split function
+split;
+
+# quote regex
+$apattern = qr/Frodo/;
+say "$apattern";
+
