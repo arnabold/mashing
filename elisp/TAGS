@@ -1,0 +1,22 @@
+
+3.12.exercises.el,93
+(defun my-double 3,128
+(defun my-double-interactive 8,239
+(defun check-fill-column 16,605
+
+3.how-to-write-function-definitions.el,162
+(defun multiply-by-seven 9,214
+(defun multiply-by-seven 26,1042
+(defun multiply-by-seven 31,1215
+(defun type-of-animal 79,2858
+(defun type-of-animal 93,3375
+
+4.a-few-buffer-related-functions.el,0
+
+2.practicing-evaluation.el,0
+
+2.5.exercise.el,0
+
+1.list-processing.el,0
+
+1.11.exercises.el,0
