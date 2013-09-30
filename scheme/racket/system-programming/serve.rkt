@@ -18,7 +18,14 @@
   (define (loop)
     (accept-and-handle listener)
     (loop))
-  (loop))
+  ;; put the listener loop in its own thread and have serve to run
+  ;; immediately.
+  (define t (thread loop))
+  ;; Have serve return an anonymous function that can be used to
+  ;; shut down the server thread and tcp listener
+  (lambda ()
+    (kill-thread t)
+    (tcp-close listener)))
 
 ;; accept-and-handle
 ;; accepts a client connection using tcp-accept, which returns two
@@ -26,10 +33,15 @@
 ;; output to the client.
 (define (accept-and-handle listener)
   (define-values (in out) (tcp-accept listener))
-  (handle in out)
-  (close-input-port in)
-  (close-output-port out))
-
+  ;; we can put each individual connection in its own thread
+  (thread
+   (lambda ()
+     ;; just to show the effect of different threads
+     (sleep (random 10))
+     (handle in out)
+     (close-input-port in)
+     (close-output-port out))))
+  
 ;; handle
 ;; for now reads and discards the request header and the write "Hello,
 ;; world!" web page as the result
