@@ -1,24 +1,25 @@
 #lang racket
 
+(require xml ;; xexpt->string, to produce HTML
+         net/url ;; string->url, url-path, path/param-path and url-query
+         )
+
 (define (serve port-no)
-  (define main-cust (make-custodian)) ;; main-cust owns listener, main
-  ;; server thread loop
+  (define main-cust (make-custodian)) 
   (parameterize ([current-custodian main-cust])
+    ;; Listener
     (define listener (tcp-listen port-no 5 #t))
     (define (loop)
       (accept-and-handle listener)
       (loop))
-    ;; Server thread
+    ;; Main Server thread
     (thread loop))
   (lambda ()
     (custodian-shutdown-all main-cust)))
 
 (define (accept-and-handle listener)
-  (define cust (make-custodian)) ;; creates a new custodians
-  (parameterize ([current-custodian cust]) ;; A parameter that
-    ;; determines a custodian that assumes responsibility for newly
-    ;; created threads, file-stream ports, TCP ports, TCP listeners,
-    ;; UDP sockets, and byte converters.
+  (define cust (make-custodian)) 
+  (parameterize ([current-custodian cust]) 
     (define-values (in out) (tcp-accept listener))  
     ;; Connection Thread
     (thread (lambda ()
@@ -28,71 +29,103 @@
   ;; Watcher Thread
   (thread (lambda ()
             (sleep 10)
-            (custodian-shutdown-all cust))) ;; With this
-    ;; implementation, in, out, and the thread that calls handle all
-    ;; belong to cust. In addition, if we later change handle so that
-    ;; it, say, opens a file, then the file handles will also belong
-    ;; to cust, so they will be reliably closed when cust is shut
-    ;; down.
-  )
-  
+            (custodian-shutdown-all cust))))
+
 (define (handle in out)
-  ;; Discard the request header (up to blank line):
-  (regexp-match #rx"(\r\n|^)\r\n" in)
-  ;; Send reply:
-  (display "HTTP/1.0 200 Okay\r\n" out)
-  (display "Server: k\r\nContent-Type: text/html\r\n\r\n" out)
-  (display "<html><body>Hello, world!</body></html>" out))
+  (define req
+    ;; Match the first line to extract the request:
+    (regexp-match #rx"^GET (.+) HTTP/[0-9]+\\.[0-9]+"
+                  (read-line in)))
+  (when req
+    ;; Discard the request header (up to blank line):
+    (regexp-match #rx"(\r\n|^)\r\n" in)
+    ;; Dispatch:
+    (let ([xexpr (dispatch (list-ref req 1))])
+      ;; Send reply:
+      (display "HTTP/1.0 200 Okay\r\n" out)
+      (display "Server: k\r\nContent-Type: text/html\r\n\r\n" out)
+      (display (xexpr->string xexpr) out))))
 
-;; A malicious client:
-;; (enter! "serve.rkt")
-;; (define stop (serve 8081))
-;; (define-values (cin cout) (tcp-connect "localhost" 8081))
-;; (read-line cin)
-;; after 10 seconds ... #<eof>
+;; dispatch:
+;; takes a requested URL and produces a result value suitable to use
+;; with xexpr->string to send back to the client
+(define (dispatch str-path)
+  ;; parse the request as a URL:
+  (define url (string->url str-path))
+  ;; Extract the path part:
+  (define path (map path/param-path (url-path url)))
+  ;; Find a handler based on the path's first element:
+  (define h (hash-ref dispatch-table (car path) #f))
+  (if h
+      ;; Call a handler:
+      (h (url-query url))
+      ;; No handler found:
+      `(html (head (title "Error"))
+             (body
+              (font
+               ((color "red"))
+               "Unknown page: "
+               ,str-path)))))
 
-;; Spikes
-;; Run with $ ~/Applications/racket/bin/raco test serve.rkt
+(define dispatch-table (make-hash))
+
+;; A simple dispatcher:
+(hash-set! dispatch-table "hello"
+           (lambda (query)
+             `(html (body "Hello, World!"))))
+
 (module+ test
   (require rackunit)
-  (check-equal? (+ 1 1) 2)
-  ;; Dynamic Binding parameterize
-  (define location (make-parameter "here")) ;; a parameter initialized
-  ;; to value "here"
-  (check-equal? (location) "here")
-  (check-equal? (parameterize ([location "there"])
-                  (location)) "there")
-  (check-equal? (location) "here") ;; When control leaves the
-  ;; parameterize form—either through a normal return, an exception, or
-  ;; some other escape—the parameter reverts to its earlier value
-  (check-equal? (parameterize ([location "in a house"])
-                  (list (location)
-                        (parameterize ([location "with a mouse"])
-                          (location))
-                        (location)))
-                '("in a house" "with a mouse" "in a house"))
-  (define (would-you-could-you?)
-    (and (not (equal? (location) "here"))
-         (not (equal? (location) "there"))))
-  (check-false (would-you-could-you?))
-  (check-true (parameterize ([location "on a bus"])
-                (would-you-could-you?)))
-  (check-equal?
-   (let
-       ([get (parameterize ([location "with a fox"])
-               (lambda () (location)))])
-     (get)) ;; localtion evaluated outside parameterize
-   "here")
-  (define (try-again! where)
-    (location where))
-  (check-equal? (location) "here")
-  (check-equal?
-   (parameterize ([location "on a train"])
-     (list (location)
-           (begin (try-again! "in a boat")
-                  (location))))
-   '("on a train" "in a boat")) 
-  ) 
 
+  (check-equal?
+   (xexpr->string '(html (head (title "Hello")) (body "Hi!")))
+   "<html><head><title>Hello</title></head><body>Hi!</body></html>")
 
+  (define u (string->url "http://localhost:8080/foo/bar?x=bye"))
+  
+  ;; (url-path u) ;; => (#<path/param> #<path/param>)
+  
+  (check-equal? (map path/param-path (url-path u))
+                '("foo" "bar"))
+  (check-equal? (url-query u) '((x . "bye")))
+
+  (check-equal? (regexp-match #rx"^GET (.+) HTTP/[0-9]+\\.[0-9]+"
+                              "GET /foo/bar?x=bye HTTP/1.1")
+                '("GET /foo/bar?x=bye HTTP/1.1" "/foo/bar?x=bye"))
+  
+  (check-equal? (regexp-match #rx"(\r\n|^)\r\n" "Host: localhost:8080\r\nConnection: keep-alive\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/28.0.1500.71 Chrome/28.0.1500.71 Safari/537.36\r\nAccept-Encoding: gzip,deflate,sdch\r\nAccept-Language: en-US,en;q=0.8\r\n\r\n")
+                '("\r\n\r\n" "\r\n"))
+  (check-equal?
+   (list-ref (regexp-match #rx"^GET (.+) HTTP/[0-9]+\\.[0-9]+"
+                           "GET /foo/bar?x=bye HTTP/1.1") 1)
+   "/foo/bar?x=bye")
+
+  (define str-path "/foo/bar?x=bye")
+  
+  (check-equal?
+   (map path/param-path (url-path (string->url str-path)))
+   '("foo" "bar"))
+
+  (check-equal?
+   (xexpr->string `(html (head (title "Error"))
+                         (body
+                          (font ((color "red"))
+                                "Unknown page: "
+                                ,str-path))))
+   "<html><head><title>Error</title></head><body><font color=\"red\">Unknown page: /foo/bar?x=bye</font></body></html>"
+   )
+  
+  (check-equal?
+   (dispatch str-path)
+   '(html (head (title "Error")) (body (font ((color "red")) "Unknown page: " "/foo/bar?x=bye"))))
+  
+  (check-equal?
+   (xexpr->string (dispatch str-path))
+   "<html><head><title>Error</title></head><body><font color=\"red\">Unknown page: /foo/bar?x=bye</font></body></html>")
+
+  (check-equal?
+   ((hash-ref dispatch-table "hello" #f) (url-query u))
+   '(html (body "Hello, World!"))) 
+  
+  )
 
