@@ -73,21 +73,26 @@
 (define (reply query)
   (define n (string->number (cdr (assq 'number query))))
   `(html (body ,@(for/list ([i (in-range n)]) " hello"))))
-(hash-set! dispatch-table "reply" reply) 
+(hash-set! dispatch-table "reply" reply)
+
+(define (sum query)
+  (build-request-page "First number:" "/one" ""))
+(hash-set! dispatch-table "sum" sum)
+
+(define (one query)
+  (build-request-page "Second number:" "/two"
+                      (cdr (assq 'number query))))
+(hash-set! dispatch-table "one" one)
+
+(define (two query)
+  (let
+      ([n (string->number (cdr (assq 'hidden query)))]
+       [m (string->number (cdr (assq 'number query)))])
+    `(html (body "The sum is " ,(number->string (+ m n))))))
+(hash-set! dispatch-table "two" two)
 
 (module+ test
   
   (require rackunit)
   
-  (define url (string->url "http://sky@www:801/cgi-bin/finger;xyz?name=shriram;host=nw#top"))
-  (check-equal? (url-scheme url) "http")
-  (check-equal? (url-user url) "sky")
-  (check-equal? (url-host url) "www")
-  (check-equal? (url-port url) 801)
-  (check-equal? (path/param-path (first (url-path url))) "cgi-bin")
-  (check-equal? (path/param-param (first (url-path url))) '())
-  (check-equal? (path/param-path (second (url-path url))) "finger")
-  (check-equal? (path/param-param (second (url-path url))) '("xyz"))   
-  (check-equal? (url-query url) '((name . "shriram") (host . "nw")))
-  (check-equal? (url-fragment url) "top")
 ) 
