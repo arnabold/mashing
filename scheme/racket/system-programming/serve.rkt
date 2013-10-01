@@ -46,7 +46,6 @@
       ;; Send reply:
       (display "HTTP/1.0 200 Okay\r\n" out)
       (display "Server: k\r\nContent-Type: text/html\r\n\r\n" out)
-      (display req out)
       (display (xexpr->string xexpr) out))))
 
 (define (dispatch str-path)
@@ -87,13 +86,14 @@
 
 (define (many query)
   (build-request-page "Number of greetings:" "/reply" ""))
- 
+
 (define (reply query)
-;;  (define n (string->number (cdr (assq 'number query))))
-  (define n (string->number (second (assq 'number query))))
+  ;;(display query)
+  ;;(flush-output)
+  (define n (string->number (cdr (assq 'number query))))
   `(html (body ,@(for/list ([i (in-range n)])
                    " hello"))))
- 
+
 (hash-set! dispatch-table "many" many) ;; i.e.: http://localhost:8080/many
 (hash-set! dispatch-table "reply" reply) ;; i.e.: http://localhost:8080/reply?number=5&hidden=&enter=Enter
 
@@ -125,12 +125,16 @@
 
   (check-equal? (assq 3 (list (list 1 2) (list 3 4) (list 5 6)))
                 '(3 4))
-  (check-equal? (assq 'number '(("a" "b") (number "c")))
-                '(number "c"))
-  (check-equal? (cdr (assq 'number '(("a" "b") (number "c")))) 
-                '("c"))
-  (check-equal? (string->number (second (assq 'number '(("a" "b") (number "5"))))) 
-                5)   
+  
+  (check-equal? (assq 'number '((number . "5") (hidden . nil) (enter . "Enter")))
+                '(number . "5"))
+  
+  (check-equal? (cdr (assq 'number '((number . "5") (hidden . nil) (enter . "Enter")))) 
+                "5")
+  
+  (check-equal? (string->number (cdr (assq 'number '((number . "5") (hidden . nil) (enter . "Enter"))))) 
+                5)
+  
   (check-equal?
    (for/list ([i (in-range 5)])
      "hello")
@@ -142,10 +146,5 @@
    '(html (body " hello" " hello" " hello" " hello" " hello")))
   
   (check-equal?
-   (reply '((a b) (number "5")))
-   '(html (body " hello" " hello" " hello" " hello" " hello")))
-  ) 
- 
-  
-  
-
+   (reply '((number . "5") (hidden . nil) (enter . "Enter")))
+   '(html (body " hello" " hello" " hello" " hello" " hello")))) 
