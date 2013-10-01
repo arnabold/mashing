@@ -1,11 +1,10 @@
 #lang racket
 
-(require xml ;; xexpt->string, to produce HTML
-         net/url ;; string->url, url-path, path/param-path and url-query
-         )
+(require xml 
+         net/url)
 
 (define (serve port-no)
-  (define main-cust (make-custodian)) 
+  (define main-cust (make-custodian))
   (parameterize ([current-custodian main-cust])
     ;; Listener
     (define listener (tcp-listen port-no 5 #t))
@@ -34,32 +33,30 @@
 (define (handle in out)
   (define req
     ;; Match the first line to extract the request:
+    ;; First line should be like GET /ciao/miao?a=b&c=d HTTP/1.1
+    ;; and the result of regexp-match
+    ;; (GET /ciao/miao?a=b&c=d HTTP/1.1 /ciao/miao?a=b&c=d)
     (regexp-match #rx"^GET (.+) HTTP/[0-9]+\\.[0-9]+"
                   (read-line in)))
   (when req
-    ;; Discard the request header (up to blank line):
+    ;; Discard the other request header lines (up to blank line):
     (regexp-match #rx"(\r\n|^)\r\n" in)
     ;; Dispatch:
-    (let ([xexpr (dispatch (list-ref req 1))])
+    (let ([xexpr (dispatch (list-ref req 1))]) ;; i.e. (dispatch "/ciao/miao?a=b&c=d HTTP/1.1")
       ;; Send reply:
       (display "HTTP/1.0 200 Okay\r\n" out)
       (display "Server: k\r\nContent-Type: text/html\r\n\r\n" out)
+      (display req out)
       (display (xexpr->string xexpr) out))))
 
-;; dispatch:
-;; takes a requested URL and produces a result value suitable to use
-;; with xexpr->string to send back to the client
 (define (dispatch str-path)
-  ;; parse the request as a URL:
   (define url (string->url str-path))
-  ;; Extract the path part:
   (define path (map path/param-path (url-path url)))
-  ;; Find a handler based on the path's first element:
   (define h (hash-ref dispatch-table (car path) #f))
   (if h
       ;; Call a handler:
       (h (url-query url))
-      ;; No handler found:
+      ;; No handler found
       `(html (head (title "Error"))
              (body
               (font
@@ -69,63 +66,86 @@
 
 (define dispatch-table (make-hash))
 
-;; A simple dispatcher:
 (hash-set! dispatch-table "hello"
            (lambda (query)
              `(html (body "Hello, World!"))))
 
+;; build-request-page
+;; constructs and HTML form
+;; label is a string to show the user
+;; next-url is a destination for the form result
+;; hidden is a value to propagate through the form as a hidden field
+(define (build-request-page label next-url hidden)
+  `(html
+    (head (title "Enter a Number to Add"))
+    (body ([bgcolor "white"])
+          (form ([action ,next-url] [method "get"])
+                ,label
+                (input ([type "text"] [name "number"] [value ""]))
+                (input ([type "hidden"] [name "hidden"] [value ,hidden]))
+                (input ([type "submit"] [name "enter"] [value "Enter"]))))))
+
+(define (many query)
+  (build-request-page "Number of greetings:" "/reply" ""))
+ 
+(define (reply query)
+;;  (define n (string->number (cdr (assq 'number query))))
+  (define n (string->number (second (assq 'number query))))
+  `(html (body ,@(for/list ([i (in-range n)])
+                   " hello"))))
+ 
+(hash-set! dispatch-table "many" many) ;; i.e.: http://localhost:8080/many
+(hash-set! dispatch-table "reply" reply) ;; i.e.: http://localhost:8080/reply?number=5&hidden=&enter=Enter
+
 (module+ test
+  
   (require rackunit)
+  
+  (check-equal?
+   (build-request-page "Number of greetings:" "/reply" "")
+   '(html
+     (head (title "Enter a Number to Add"))
+     (body ((bgcolor "white"))
+           (form ((action "/reply") (method "get"))
+                 "Number of greetings:"
+                 (input ((type "text") (name "number") (value "")))
+                 (input ((type "hidden") (name "hidden") (value "")))
+                 (input ((type "submit") (name "enter") (value "Enter")))))))
 
   (check-equal?
-   (xexpr->string '(html (head (title "Hello")) (body "Hi!")))
-   "<html><head><title>Hello</title></head><body>Hi!</body></html>")
+   (many 'an-unused-query)
+   '(html
+     (head (title "Enter a Number to Add"))
+     (body ((bgcolor "white"))
+           (form ((action "/reply") (method "get"))
+                 "Number of greetings:"
+                 (input ((type "text") (name "number") (value "")))
+                 (input ((type "hidden") (name "hidden") (value "")))
+                 (input ((type "submit") (name "enter") (value "Enter")))))))
 
-  (define u (string->url "http://localhost:8080/foo/bar?x=bye"))
-  
-  ;; (url-path u) ;; => (#<path/param> #<path/param>)
-  
-  (check-equal? (map path/param-path (url-path u))
-                '("foo" "bar"))
-  (check-equal? (url-query u) '((x . "bye")))
-
-  (check-equal? (regexp-match #rx"^GET (.+) HTTP/[0-9]+\\.[0-9]+"
-                              "GET /foo/bar?x=bye HTTP/1.1")
-                '("GET /foo/bar?x=bye HTTP/1.1" "/foo/bar?x=bye"))
-  
-  (check-equal? (regexp-match #rx"(\r\n|^)\r\n" "Host: localhost:8080\r\nConnection: keep-alive\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nUser-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Ubuntu Chromium/28.0.1500.71 Chrome/28.0.1500.71 Safari/537.36\r\nAccept-Encoding: gzip,deflate,sdch\r\nAccept-Language: en-US,en;q=0.8\r\n\r\n")
-                '("\r\n\r\n" "\r\n"))
+  (check-equal? (assq 3 (list (list 1 2) (list 3 4) (list 5 6)))
+                '(3 4))
+  (check-equal? (assq 'number '(("a" "b") (number "c")))
+                '(number "c"))
+  (check-equal? (cdr (assq 'number '(("a" "b") (number "c")))) 
+                '("c"))
+  (check-equal? (string->number (second (assq 'number '(("a" "b") (number "5"))))) 
+                5)   
   (check-equal?
-   (list-ref (regexp-match #rx"^GET (.+) HTTP/[0-9]+\\.[0-9]+"
-                           "GET /foo/bar?x=bye HTTP/1.1") 1)
-   "/foo/bar?x=bye")
-
-  (define str-path "/foo/bar?x=bye")
-  
-  (check-equal?
-   (map path/param-path (url-path (string->url str-path)))
-   '("foo" "bar"))
+   (for/list ([i (in-range 5)])
+     "hello")
+   '("hello" "hello" "hello" "hello" "hello"))
 
   (check-equal?
-   (xexpr->string `(html (head (title "Error"))
-                         (body
-                          (font ((color "red"))
-                                "Unknown page: "
-                                ,str-path))))
-   "<html><head><title>Error</title></head><body><font color=\"red\">Unknown page: /foo/bar?x=bye</font></body></html>"
-   )
+   `(html (body ,@(for/list ([i (in-range 5)])
+                    " hello")))
+   '(html (body " hello" " hello" " hello" " hello" " hello")))
   
   (check-equal?
-   (dispatch str-path)
-   '(html (head (title "Error")) (body (font ((color "red")) "Unknown page: " "/foo/bar?x=bye"))))
+   (reply '((a b) (number "5")))
+   '(html (body " hello" " hello" " hello" " hello" " hello")))
+  ) 
+ 
   
-  (check-equal?
-   (xexpr->string (dispatch str-path))
-   "<html><head><title>Error</title></head><body><font color=\"red\">Unknown page: /foo/bar?x=bye</font></body></html>")
-
-  (check-equal?
-   ((hash-ref dispatch-table "hello" #f) (url-query u))
-   '(html (body "Hello, World!"))) 
   
-  )
 
