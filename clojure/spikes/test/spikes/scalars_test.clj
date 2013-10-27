@@ -1,6 +1,6 @@
 (ns spikes.scalars-test
   (:use clojure.test))
-(deftest a-test
+(deftest a-test 
   (testing "scalars 2.1"
     (println "Scalars")
     (testing "numbers 2.1.1"
@@ -204,50 +204,64 @@
         (- x))) ; x is not in tail position, (- x) is in tail position
     ; (fn [x] (recur x) (println x)) compiletime error
     ))
-  (testing "quoting 2.6"
-    ; quote
-    ; syntax-quote
-    (testing "evaluation 2.6.1"
-      ; (eval cons) #<core$cons clojure.core$cons@553d26fd>
-      (is (= '(1 2 3) (cons 1 [2 3]))))
-    (testing "quoting 2.6.2"
-      (is (= 'tena (quote tena)))
-      (def tena 9)
-      (is (= 'tena (quote tena)))
-      (is (= '(cons 1 (2 3))) (quote (cons 1 [2 3])))
-      (is (thrown-with-msg? 
-            ClassCastException 
-            #"java.lang.Long cannot be cast to clojure.lang.IFn" 
-            (cons 1 (2 3)))) ; a number cannot be used as a function
-      (is (= '(cons 1 (2 3))) (quote (cons 1 '(2 3))))
-      (is (= '(cons 1 (2 3))) (quote (cons 1 (quote(2 3)))))
-      (is (= [1 5] [1 (+ 2 3)]))
-      (is (= '(1 '(+ 2 3) '(1 (+ 2 3)))))
-      (is (= () ()))
-      (is (= () '()))
-      ; syntax-quote expands to ...
-      (is (= '(1 2 3) `(1 2 3)))
-      (is (= 'clojure.core/map `map))
-      (is (= 'java.lang.Integer `Integer))
-      (is (= '(clojure.core/map clojure.core/even? [1 2 3]) `(map even? [1 2 3])))
-      (is (= 'spikes.scalars-test/is-always-right `is-always-right)))
-    (testing "unquote 2.6.3"
-      (is (= '(clojure.core/+ 10 (clojure.core/* 3 2)) `(+ 10 (* 3 2))))
-      (is (= '(clojure.core/+ 10 6) `(+ 10 ~(* 3 2))))
-      (is (= '(1 2 3) `(1 2 ~3)))
-      (is (= '(1 2 3) (let [x 2] `(1 ~x 3))))
-      (is (= `(1 2 3) (let [x 2] `(1 ~x 3))))
-      (is (thrown-with-msg? 
-            ClassCastException 
-            #"java.lang.Long cannot be cast to clojure.lang.IFn" 
-            `(1 ~(2 3)))) 
-      (is (= '(1 (2 3)) (let [x '(2 3)] `(1 ~x))))
-      ; unquote-splicing
-      ; ; unpack the sequence x
-      (is (= '(1 2 3) (let [x '(2 3)] `(1 ~@x)))))
-    (testing "auto-gensym 2.6.5"
-      ; to generate a new unqualified symbol
-      (println `potion#)
-      )
+(testing "quoting 2.6"
+  ; quote
+  ; syntax-quote
+  (testing "evaluation 2.6.1"
+    ; (eval cons) #<core$cons clojure.core$cons@553d26fd>
+    (is (= '(1 2 3) (cons 1 [2 3]))))
+  (testing "quoting 2.6.2"
+    (is (= 'tena (quote tena)))
+    (def tena 9)
+    (is (= 'tena (quote tena)))
+    (is (= '(cons 1 (2 3))) (quote (cons 1 [2 3])))
+    (is (thrown-with-msg? 
+          ClassCastException 
+          #"java.lang.Long cannot be cast to clojure.lang.IFn" 
+          (cons 1 (2 3)))) ; a number cannot be used as a function
+    (is (= '(cons 1 (2 3))) (quote (cons 1 '(2 3))))
+    (is (= '(cons 1 (2 3))) (quote (cons 1 (quote(2 3)))))
+    (is (= [1 5] [1 (+ 2 3)]))
+    (is (= '(1 '(+ 2 3) '(1 (+ 2 3)))))
+    (is (= () ()))
+    (is (= () '()))
+    ; syntax-quote expands to ...
+    (is (= '(1 2 3) `(1 2 3)))
+    (is (= 'clojure.core/map `map))
+    (is (= 'java.lang.Integer `Integer))
+    (is (= '(clojure.core/map clojure.core/even? [1 2 3]) `(map even? [1 2 3])))
+    (is (= 'spikes.scalars-test/is-always-right `is-always-right)))
+  (testing "unquote 2.6.3"
+    (is (= '(clojure.core/+ 10 (clojure.core/* 3 2)) `(+ 10 (* 3 2))))
+    (is (= '(clojure.core/+ 10 6) `(+ 10 ~(* 3 2))))
+    (is (= '(1 2 3) `(1 2 ~3)))
+    (is (= '(1 2 3) (let [x 2] `(1 ~x 3))))
+    (is (= `(1 2 3) (let [x 2] `(1 ~x 3))))
+    (is (thrown-with-msg? 
+          ClassCastException 
+          #"java.lang.Long cannot be cast to clojure.lang.IFn" 
+          `(1 ~(2 3)))) 
+    (is (= '(1 (2 3)) (let [x '(2 3)] `(1 ~x))))
+    ; unquote-splicing
+    ; ; unpack the sequence x
+    (is (= '(1 2 3) (let [x '(2 3)] `(1 ~@x)))))
+  (testing "auto-gensym 2.6.5"
+    ; to generate a new unqualified symbol
+    (println `potion#)))
+(testing "java interop 2.7"
+  (testing "accessing static class members 2.7.1"
+    (println java.util.Locale/JAPAN)
+    (is (= 3.0 (Math/sqrt 9))) ; java.lang.Math
     )
+  (testing "creating java class instance 2.7.2"
+    (is (= 
+          (new java.util.HashMap { "foo" 42 "bar" 9 "baz" "quux"}) 
+          (java.util.HashMap. { "foo" 42 "bar" 9 "baz" "quux"}))))
+  (testing "accessing java instance members 2.7.3"
+    (is (= 10 (.x (java.awt.Point. 10 20))))
+    (is (= 21M (.divide (java.math.BigDecimal. "42") 2M)))) 
+  (testing "setting java instance properties 2.7.4"
+    (
+    )
+  )
 )
